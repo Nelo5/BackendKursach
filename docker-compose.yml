@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: postgres_db_backend
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: app_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: fastapi_app_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=app_db
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+    networks:
+      - app_network
+
+
+  adminer:
+    image: adminer:latest
+    container_name: adminer_web
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Указываем имя сервиса БД для автоподстановки в форме логина
+      ADMINER_DEFAULT_SERVER: postgres
+    networks:
+      - app_network        
+      
+  frontend:
+    build: ./frontend
+    container_name: react_app
+    ports:
+      - "3000:80"
+    depends_on:
+      - web
+    networks:
+      - app_network             
+
+# Определяем тома для хранения данных
+volumes:
+  postgres_data:
+
+
+networks:
+  app_network:
+    driver: bridge
