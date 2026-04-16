@@ -18,20 +18,20 @@ def get_current_user_dependency(
 def get_current_active_user(
     current_user: models.User = Depends(get_current_user_dependency)
 ):
-    if current_user.status != models.UserStatus.ACTIVE:
+    if current_user.status != models.UserStatus.active:
         raise HTTPException(status_code=403, detail="User is blocked")
     return current_user
 
 def get_teacher_user(
     current_user: models.User = Depends(get_current_active_user)
 ):
-    if current_user.role not in [models.UserRole.TEACHER, models.UserRole.ADMIN]:
+    if current_user.role not in [models.UserRole.teacher, models.UserRole.admin]:
         raise HTTPException(status_code=403, detail="Teacher or admin privileges required")
     return current_user
 
 def get_admin_user(
     current_user: models.User = Depends(get_current_active_user)
 ):
-    if current_user.role != models.UserRole.ADMIN:
+    if current_user.role != models.UserRole.admin:
         raise HTTPException(status_code=403, detail="Admin privileges required")
     return current_user

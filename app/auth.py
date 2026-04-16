@@ -21,7 +21,7 @@ def get_password_hash(password):
 
 def authenticate_user(db: Session, username: str, password: str):
     user = db.query(models.User).filter(models.User.username == username).first()
-    if not user or user.status == models.UserStatus.BLOCKED:
+    if not user or user.status == models.UserStatus.blocked:
         return False
     if not verify_password(password, user.password):
         return False
@@ -52,6 +52,6 @@ def get_current_user(token: str, db: Session):
         raise credentials_exception
     
     user = db.query(models.User).filter(models.User.id == user_id).first()
-    if user is None or user.status == models.UserStatus.BLOCKED:
+    if user is None or user.status == models.UserStatus.blocked:
         raise credentials_exception
     return user

@@ -1,37 +1,48 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, model_validator
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from enum import Enum
 
+
+# ===================== ENUMS =====================
+
 class UserRole(str, Enum):
-    ADMIN = "admin"
-    TEACHER = "teacher"
-    STUDENT = "student"
+    admin = "admin"
+    teacher = "teacher"
+    student = "student"
+
 
 class UserStatus(str, Enum):
-    ACTIVE = "active"
-    BLOCKED = "blocked"
+    active = "active"
+    blocked = "blocked"
+
 
 class QuestionType(str, Enum):
-    OPEN = "open"
-    CLOSED = "closed"
+    open = "open"
+    single_choice = "single_choice"
+    multiple_choice = "multiple_choice"
+
 
 class TestStatus(str, Enum):
-    DRAFT = "draft"
-    PUBLISHED = "published"
-    BLOCKED = "blocked"
+    draft = "draft"
+    published = "published"
+    blocked = "blocked"
 
-# Схемы пользователей
+
+# ===================== USERS =====================
+
 class UserBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
 
+
 class UserCreate(UserBase):
     password: str = Field(..., min_length=6)
-    role: UserRole
+
 
 class UserLogin(BaseModel):
     username: str
     password: str
+
 
 class UserResponse(UserBase):
     id: int
@@ -42,68 +53,85 @@ class UserResponse(UserBase):
     class Config:
         from_attributes = True
 
+
 class UserUpdateRole(BaseModel):
     role: UserRole
+
 
 class UserUpdateStatus(BaseModel):
     status: UserStatus
 
-# Схемы для вопросов
-class ClosedQuestionData(BaseModel):
-    options: List[str] = Field(..., min_items=2)
-    correct: List[int] = Field(..., min_items=1)
 
-class OpenQuestionData(BaseModel):
-    keywords: List[str] = Field(..., min_items=1)
-    case_sensitive: bool = False
 
-class QuestionBase(BaseModel):
+class QuestionCreate(BaseModel):
     question_text: str = Field(..., min_length=1)
     question_type: QuestionType
     points: float = Field(..., gt=0)
-    order_number: int
+    data: Dict[str, Any]
 
-class QuestionCreate(QuestionBase):
-    closed_question_data: Optional[ClosedQuestionData] = None
-    open_question_data: Optional[OpenQuestionData] = None
+    @model_validator(mode="after")
+    def validate_data(self):
+        qtype = self.question_type
+        data = self.data
 
-    @validator('closed_question_data')
-    def validate_closed_data(cls, v, values):
-        if values.get('question_type') == QuestionType.CLOSED and not v:
-            raise ValueError('Closed question requires closed_question_data')
-        return v
+        if qtype == QuestionType.single_choice:
+            if "options" not in data or "correct" not in data:
+                raise ValueError("single_choice requires options and correct")
+            if len(data["correct"]) != 1:
+                raise ValueError("single_choice must have exactly 1 correct answer")
 
-    @validator('open_question_data')
-    def validate_open_data(cls, v, values):
-        if values.get('question_type') == QuestionType.OPEN and not v:
-            raise ValueError('Open question requires open_question_data')
-        return v
+        elif qtype == QuestionType.multiple_choice:
+            if "options" not in data:
+                raise ValueError("multiple_choice requires options")
+            for opt in data["options"]:
+                if "weight" not in opt:
+                    raise ValueError("each option must have weight")
 
-class QuestionResponse(QuestionBase):
+        elif qtype == QuestionType.open:
+            if "keywords" not in data:
+                raise ValueError("open question requires keywords")
+
+        return self
+
+
+class QuestionUpdate(BaseModel):
+    question_text: Optional[str] = None
+    question_type: Optional[QuestionType] = None
+    points: Optional[float] = None
+    data: Optional[Dict[str, Any]] = None
+
+
+class QuestionResponse(BaseModel):
     id: int
-    test_id: int
-    closed_question_data: Optional[Dict[str, Any]] = None
-    open_question_data: Optional[Dict[str, Any]] = None
-
+    question_text: str
+    question_type: QuestionType
+    points: float
+    data: Dict[str, Any]
+    
     class Config:
         from_attributes = True
 
-# Схемы для тестов
+# ===================== TESTS =====================
+
 class TestBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     subject: str = Field(..., min_length=1)
     description: Optional[str] = None
     max_score: float = Field(..., gt=0)
 
+
 class TestCreate(TestBase):
-    questions: List[QuestionCreate]
+    question_ids: List[int]  # вместо questions: List[QuestionCreate]
+
 
 class TestUpdate(BaseModel):
     title: Optional[str] = None
     subject: Optional[str] = None
     description: Optional[str] = None
     max_score: Optional[float] = None
-    questions: Optional[List[QuestionCreate]] = None
+    status: Optional[TestStatus] = None
+    question_ids: Optional[List[int]] = None  # вместо questions
+
 
 class TestResponse(TestBase):
     id: int
@@ -117,37 +145,50 @@ class TestResponse(TestBase):
     class Config:
         from_attributes = True
 
+
 class TestListItem(TestBase):
     id: int
     version: int
     status: TestStatus
     author_id: int
 
-class TestStatusUpdate(BaseModel):
-    status: TestStatus
+
+
+
 
 class TestAccessGrant(BaseModel):
     student_ids: List[int]
 
-# Схемы для ответов
+
+# ===================== ANSWERS =====================
+
 class AnswerSubmit(BaseModel):
+    answer_data: Optional[Dict[str, Any]]
+
+    @model_validator(mode="after")
+    def validate_answer_data(self):
+        if "text" not in self.answer_data and "selected_options" not in self.answer_data:
+            raise ValueError("answer_data must contain 'text' or 'selected_options'")
+        # Дополнительно можно проверять соответствие типу вопроса, но это лучше делать в сервисе
+        return self
+
+class AnswerResponse(BaseModel):
     question_id: int
-    answer_text: Optional[str] = None
-    selected_options: Optional[List[int]] = None
+    answer_data: Optional[Dict[str, Any]]
+    is_correct: bool = False
+    points_earned: float = 0.0
+ 
 
 class AttemptStart(BaseModel):
     test_id: int
+
 
 class AttemptSubmit(BaseModel):
     attempt_id: int
     answers: List[AnswerSubmit]
 
-class AnswerResponse(BaseModel):
-    question_id: int
-    answer_text: Optional[str]
-    selected_options: Optional[List[int]]
-    is_correct: bool
-    points_earned: float
+
+
 
 class AttemptResponse(BaseModel):
     id: int
@@ -163,33 +204,12 @@ class AttemptResponse(BaseModel):
     class Config:
         from_attributes = True
 
-class AttemptDetailResponse(AttemptResponse):
-    pass
 
-# Фильтры
-class TestFilter(BaseModel):
-    subject: Optional[str] = None
-    status: Optional[TestStatus] = None
+# ===================== ATTEMPTS (СТАТИСТИКА) =====================
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    user_id: int
-    username: str
-    role: UserRole
-
-class TokenData(BaseModel):
-    username: Optional[str] = None
-    user_id: Optional[int] = None
-    role: Optional[UserRole] = None
-
-# ... (предыдущие схемы остаются без изменений)
-
-# Схемы для списка попыток (краткая информация)
 class AttemptListItem(BaseModel):
-    """Краткая информация о попытке для списка"""
     attempt_id: int
-    attempt_number: int  # Номер попытки (1, 2, 3...)
+    attempt_number: int
     started_at: datetime
     completed_at: Optional[datetime]
     score: Optional[float]
@@ -199,17 +219,17 @@ class AttemptListItem(BaseModel):
     class Config:
         from_attributes = True
 
+
 class StudentAttemptListItem(AttemptListItem):
-    """Для студента - список его попыток по тесту"""
     pass
 
+
 class TeacherAttemptListItem(AttemptListItem):
-    """Для преподавателя - список попыток студентов с именем"""
     student_id: int
     student_name: str
 
+
 class TestAttemptsSummary(BaseModel):
-    """Сводка по попыткам теста для преподавателя"""
     test_id: int
     test_title: str
     total_attempts: int
@@ -218,8 +238,8 @@ class TestAttemptsSummary(BaseModel):
     lowest_score: float
     attempts: List[TeacherAttemptListItem]
 
+
 class StudentTestAttemptsSummary(BaseModel):
-    """Сводка по попыткам студента по конкретному тесту"""
     test_id: int
     test_title: str
     best_score: Optional[float]
@@ -227,41 +247,58 @@ class StudentTestAttemptsSummary(BaseModel):
     total_attempts: int
     attempts: List[StudentAttemptListItem]
 
-# Детальная информация о попытке (расширенная)
+
+# ===================== DETAIL =====================
+
 class AnswerDetail(BaseModel):
-    """Детальный ответ на вопрос"""
     question_id: int
     question_text: str
     question_type: QuestionType
     points: float
     points_earned: float
     is_correct: bool
-    user_answer: Optional[str] = None  # Для открытых вопросов
-    selected_options: Optional[List[int]] = None  # Для закрытых вопросов
-    correct_answer: Optional[str] = None  # Правильный ответ для отображения
-    correct_options: Optional[List[int]] = None  # Правильные варианты для закрытых
+    answer_data: Optional[Dict[str, Any]]
+
 
 class AttemptDetailResponse(BaseModel):
-    """Детальная информация о попытке"""
     attempt_id: int
     attempt_number: int
-    student_id: Optional[int] = None  # Для преподавателя
-    student_name: Optional[str] = None  # Для преподавателя
+    student_id: Optional[int] = None
+    student_name: Optional[str] = None
     test_id: int
     test_title: str
-    score: float
+    score: float = 0
     max_possible_score: float
     percentage: float
     started_at: datetime
-    completed_at: datetime
-    time_spent_minutes: Optional[float] = None  # Время в минутах
+    completed_at: Optional[datetime] = None
+    time_spent_minutes: Optional[float] = None
     answers: List[AnswerDetail]
 
+
 class AttemptHistoryResponse(BaseModel):
-    """История попыток студента по всем тестам"""
     test_id: int
     test_title: str
     best_score: float
     best_score_percentage: float
     attempts_count: int
     last_attempt_date: Optional[datetime]
+
+
+# ===================== AUTH =====================
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user_id: int
+    username: str
+    role: UserRole
+
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+    user_id: Optional[int] = None
+    role: Optional[UserRole] = None
+
+
+# ===================== ВОПРОСЫ (НЕЗАВИСИМЫЕ) =====================

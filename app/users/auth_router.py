@@ -17,8 +17,8 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = models.User(
         username=user.username,
         password=hashed_password,
-        role=models.UserRole.STUDENT,  # По умолчанию студент
-        status=models.UserStatus.ACTIVE
+        role=models.UserRole.student,  # По умолчанию студент
+        status=models.UserStatus.active
     )
     db.add(db_user)
     db.commit()
