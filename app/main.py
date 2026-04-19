@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .database import engine
-from . import models
+from app.database import engine
+from app import models
 from app.users import auth_router
 from app.questions import questions_router
 from app.tests import tests_router

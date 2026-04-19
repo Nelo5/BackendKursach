@@ -4,7 +4,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from .database import Base
+from app.database import Base
 import enum
 
 
@@ -34,7 +34,7 @@ class UserStatus(str, enum.Enum):
 
 
 test_question_association = Table(
-    'test_question_association',
+    'test_question',
     Base.metadata,
     Column('test_id', Integer, ForeignKey('tests.id', ondelete="CASCADE")),
     Column('question_id', Integer, ForeignKey('questions.id', ondelete="CASCADE"))
@@ -43,7 +43,7 @@ test_question_association = Table(
 # ===================== ASSOCIATION TABLE =====================
 
 student_test_access = Table(
-    'student_test_access',
+    'student_test',
     Base.metadata,
     Column('student_id', Integer, ForeignKey('users.id')),
     Column('test_id', Integer, ForeignKey('tests.id'))
@@ -128,14 +128,13 @@ class Question(Base):
 # ===================== TEST ATTEMPTS =====================
 
 class TestAttempt(Base):
-    __tablename__ = "test_attempts"
+    __tablename__ = "attempts"
 
     id = Column(Integer, primary_key=True, index=True)
     student_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     test_id = Column(Integer, ForeignKey("tests.id"), nullable=False)
 
     score = Column(Float, nullable=True)
-    max_possible_score = Column(Float, nullable=False)
 
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)

@@ -49,8 +49,7 @@ def start_attempt(
     # Создаём новую попытку
     attempt = models.TestAttempt(
         student_id=current_user.id,
-        test_id=test.id,
-        max_possible_score=test.max_score
+        test_id=test.id
     )
     db.add(attempt)
     db.commit()
@@ -120,9 +119,10 @@ def submit_attempt(
     return {
         "attempt_id": attempt.id,
         "score": total_score,
-        "max_score": attempt.max_possible_score,
-        "percentage": (total_score / attempt.max_possible_score) * 100 if attempt.max_possible_score else 0
+        "max_score": test.max_score,
+        "percentage": (total_score / test.max_score) * 100 if test.max_score else 0
     }
+
 
 @router.get("/my", response_model=List[schemas.AttemptListItem])
 def get_my_attempts(
@@ -140,59 +140,18 @@ def get_my_attempts(
     result = []
     for attempt in attempts:
         attempt_number = get_attempt_number(attempt.id, current_user.id, attempt.test_id, db)
-        percentage = (attempt.score / attempt.max_possible_score) * 100 if attempt.score else None
+        test = attempt.test
+        percentage = (attempt.score / test.max_score) * 100 if attempt.score and test.max_score else None
         result.append(schemas.AttemptListItem(
             attempt_id=attempt.id,
             attempt_number=attempt_number,
             started_at=attempt.started_at,
             completed_at=attempt.completed_at,
             score=attempt.score,
-            max_possible_score=attempt.max_possible_score,
             percentage=percentage
         ))
     return result
 
-
-# @router.get("/my/{attempt_id}", response_model=schemas.AttemptDetailResponse)
-# def get_my_attempt_detail(
-#     attempt_id: int,
-#     current_user: models.User = Depends(get_current_active_user),
-#     db: Session = Depends(get_db)
-# ):
-#     """Детальная информация о конкретной попытке студента (с ответами)."""
-#     if current_user.role != models.UserRole.student:
-#         raise HTTPException(status_code=403, detail="Only students can access this endpoint")
-
-#     attempt = db.query(models.TestAttempt).filter(
-#         models.TestAttempt.id == attempt_id,
-#         models.TestAttempt.student_id == current_user.id
-#     ).options(
-#         joinedload(models.TestAttempt.test),
-#         joinedload(models.TestAttempt.answers).joinedload(models.Answer.question)
-#     ).first()
-
-#     if not attempt:
-#         raise HTTPException(status_code=404, detail="Attempt not found")
-
-#     attempt_number = get_attempt_number(attempt.id, current_user.id, attempt.test_id, db)
-#     answers_detail = [build_answer_detail(ans, ans.question) for ans in attempt.answers if ans.question]
-
-#     percentage = (attempt.score / attempt.max_possible_score) * 100 if attempt.score else 0
-#     time_spent = calculate_time_spent(attempt.started_at, attempt.completed_at)
-
-#     return schemas.AttemptDetailResponse(
-#         attempt_id=attempt.id,
-#         attempt_number=attempt_number,
-#         test_id=attempt.test_id,
-#         test_title=attempt.test.title,
-#         score=attempt.score,
-#         max_possible_score=attempt.max_possible_score,
-#         percentage=percentage,
-#         started_at=attempt.started_at,
-#         completed_at=attempt.completed_at,
-#         time_spent_minutes=time_spent,
-#         answers=answers_detail
-#     )
 
 
 # ==================== ПРЕПОДАВАТЕЛЬ: ПРОСМОТР ПОПЫТОК ====================
@@ -233,7 +192,7 @@ def get_test_attempts_summary(
     scores = []
     for attempt in attempts:
         attempt_number = get_attempt_number(attempt.id, attempt.student_id, test_id, db)
-        percentage = (attempt.score / attempt.max_possible_score) * 100 if attempt.score else 0
+        percentage = (attempt.score / test.max_score) * 100 if attempt.score else 0
         scores.append(attempt.score or 0)
         attempt_items.append(schemas.TeacherAttemptListItem(
             attempt_id=attempt.id,
@@ -243,7 +202,6 @@ def get_test_attempts_summary(
             started_at=attempt.started_at,
             completed_at=attempt.completed_at,
             score=attempt.score,
-            max_possible_score=attempt.max_possible_score,
             percentage=percentage
         ))
 
@@ -293,7 +251,7 @@ def get_student_test_attempts(
     scores = []
     for attempt in attempts:
         attempt_number = get_attempt_number(attempt.id, student_id, test_id, db)
-        percentage = (attempt.score / attempt.max_possible_score) * 100 if attempt.score else 0
+        percentage = (attempt.score / test.max_score) * 100 if attempt.score else 0
         scores.append(attempt.score or 0)
         attempt_items.append(schemas.StudentAttemptListItem(
             attempt_id=attempt.id,
@@ -301,7 +259,6 @@ def get_student_test_attempts(
             started_at=attempt.started_at,
             completed_at=attempt.completed_at,
             score=attempt.score,
-            max_possible_score=attempt.max_possible_score,
             percentage=percentage
         ))
 
@@ -318,50 +275,6 @@ def get_student_test_attempts(
     )
 
 
-# @router.get("/teacher/attempt-detail/{attempt_id}", response_model=schemas.AttemptDetailResponse)
-# def get_attempt_detail_for_teacher(
-#     attempt_id: int,
-#     teacher: models.User = Depends(get_teacher_user),
-#     db: Session = Depends(get_db)
-# ):
-#     """Детальная информация о попытке студента (для преподавателя)."""
-#     attempt = db.query(models.TestAttempt).filter(
-#         models.TestAttempt.id == attempt_id,
-#         models.TestAttempt.is_completed == True
-#     ).options(
-#         joinedload(models.TestAttempt.student),
-#         joinedload(models.TestAttempt.test),
-#         joinedload(models.TestAttempt.answers).joinedload(models.Answer.question)
-#     ).first()
-
-#     if not attempt:
-#         raise HTTPException(status_code=404, detail="Attempt not found")
-
-#     test = attempt.test
-#     if test.author_id != teacher.id and teacher.role != models.UserRole.admin:
-#         raise HTTPException(status_code=403, detail="Not authorized to view this attempt")
-
-#     attempt_number = get_attempt_number(attempt.id, attempt.student_id, attempt.test_id, db)
-#     answers_detail = [build_answer_detail(ans, ans.question) for ans in attempt.answers if ans.question]
-
-#     percentage = (attempt.score / attempt.max_possible_score) * 100 if attempt.score else 0
-#     time_spent = calculate_time_spent(attempt.started_at, attempt.completed_at)
-
-#     return schemas.AttemptDetailResponse(
-#         attempt_id=attempt.id,
-#         attempt_number=attempt_number,
-#         student_id=attempt.student_id,
-#         student_name=attempt.student.username,
-#         test_id=attempt.test_id,
-#         test_title=test.title,
-#         score=attempt.score,
-#         max_possible_score=attempt.max_possible_score,
-#         percentage=percentage,
-#         started_at=attempt.started_at,
-#         completed_at=attempt.completed_at,
-#         time_spent_minutes=time_spent,
-#         answers=answers_detail
-#     )
 @router.get("/{attempt_id}", response_model=schemas.AttemptDetailResponse)
 def get_attempt_detail(
     attempt_id: int,
@@ -401,7 +314,7 @@ def get_attempt_detail(
     attempt_number = get_attempt_number(attempt.id, attempt.student_id, attempt.test_id, db)
     answers_detail = [build_answer_detail(ans, ans.question) for ans in attempt.answers if ans.question]
 
-    percentage = (attempt.score / attempt.max_possible_score) * 100 if attempt.score else 0
+    percentage = (attempt.score / attempt.test.max_score) * 100 if attempt.score else 0
     time_spent = calculate_time_spent(attempt.started_at, attempt.completed_at)
 
     # Для студента student_id и student_name можно не возвращать (или вернуть его же имя)
@@ -413,7 +326,6 @@ def get_attempt_detail(
         test_id=attempt.test_id,
         test_title=attempt.test.title,
         score=attempt.score,
-        max_possible_score=attempt.max_possible_score,
         percentage=percentage,
         started_at=attempt.started_at,
         completed_at=attempt.completed_at,

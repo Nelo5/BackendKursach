@@ -10,8 +10,8 @@ services:
       POSTGRES_DB: app_db
     ports:
       - "5432:5432"
-    volumes:
-      - ./postgres_data:/var/lib/postgresql/data
+    # volumes:
+    #   - ./postgres_data:/var/lib/postgresql/data
     networks:
       - app_network
     healthcheck:
@@ -41,7 +41,6 @@ services:
     networks:
       - app_network
 
-
   adminer:
     image: adminer:latest
     container_name: adminer_web
@@ -49,11 +48,10 @@ services:
     ports:
       - "8080:8080"
     environment:
-      # Указываем имя сервиса БД для автоподстановки в форме логина
-      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DEFAULT_SERVER: db  # Исправлено: postgres -> db
     networks:
-      - app_network        
-      
+      - app_network
+        
   frontend:
     build: ./frontend
     container_name: react_app
@@ -62,12 +60,20 @@ services:
     depends_on:
       - web
     networks:
-      - app_network             
+      - app_network
 
-# Определяем тома для хранения данных
-volumes:
-  postgres_data:
-
+  schemaspy:
+    image: schemaspy/schemaspy:latest
+    container_name: my_schemaspy
+    volumes:
+      - ./schemaspy-output:/output
+      - ./schemaspy.properties:/schemaspy.properties
+    command: ["-configFile", "/schemaspy.properties"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app_network  # Добавлено: подключаем к той же сети
 
 networks:
   app_network:

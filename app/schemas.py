@@ -195,7 +195,6 @@ class AttemptResponse(BaseModel):
     test_id: int
     test_title: str
     score: Optional[float]
-    max_possible_score: float
     started_at: datetime
     completed_at: Optional[datetime]
     is_completed: bool
@@ -213,7 +212,6 @@ class AttemptListItem(BaseModel):
     started_at: datetime
     completed_at: Optional[datetime]
     score: Optional[float]
-    max_possible_score: float
     percentage: Optional[float] = None
 
     class Config:
@@ -268,7 +266,6 @@ class AttemptDetailResponse(BaseModel):
     test_id: int
     test_title: str
     score: float = 0
-    max_possible_score: float
     percentage: float
     started_at: datetime
     completed_at: Optional[datetime] = None
@@ -300,5 +297,3 @@ class TokenData(BaseModel):
     user_id: Optional[int] = None
     role: Optional[UserRole] = None
 
-
-# ===================== ВОПРОСЫ (НЕЗАВИСИМЫЕ) =====================
