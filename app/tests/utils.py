@@ -55,43 +55,16 @@ def update_test_logic(db: Session, teacher: models.User, test_id: int, test_data
     test = db.query(models.Test).filter(models.Test.id == test_id).first()
     if not test:
         raise HTTPException(404, "Test not found")
-    if test.author_id != teacher.id and teacher.role != models.UserRole.ADMIN:
+    
+    # Проверка прав: только автор может изменять тест
+    if test.author_id != teacher.id:
         raise HTTPException(403, "Not authorized")
+    
+    # Проверка статуса: только черновик можно редактировать
+    if test.status != models.TestStatus.draft:
+        raise HTTPException(403, "Cannot update test that is not in draft status")
 
-    # Проверяем, есть ли завершённые попытки
-    completed_attempts = db.query(models.TestAttempt).filter(
-        models.TestAttempt.test_id == test_id,
-        models.TestAttempt.is_completed == True
-    ).first()
-
-    # Если меняются вопросы и есть попытки – создаём новую версию
-    if completed_attempts and test_data.question_ids is not None:
-        # Получаем вопросы по ID
-        new_questions = db.query(models.Question).filter(models.Question.id.in_(test_data.question_ids)).all()
-        if len(new_questions) != len(test_data.question_ids):
-            raise HTTPException(400, "One or more question IDs are invalid")
-
-        new_test = models.Test(
-            title=test_data.title or test.title,
-            subject=test_data.subject or test.subject,
-            description=test_data.description or test.description,
-            max_score=test_data.max_score or test.max_score,
-            author_id=teacher.id,
-            status=models.TestStatus.draft,
-            version=test.version + 1
-        )
-        db.add(new_test)
-        db.flush()
-        new_test.questions = new_questions
-        db.commit()
-        db.refresh(new_test)
-
-        # Блокируем старую версию
-        test.status = models.TestStatus.blocked
-        db.commit()
-        return new_test
-
-    # Обычное обновление (без изменения вопросов или без попыток)
+    # Обновляем вопросы (без версионирования, так как это черновик)
     if test_data.question_ids is not None:
         new_questions = db.query(models.Question).filter(models.Question.id.in_(test_data.question_ids)).all()
         if len(new_questions) != len(test_data.question_ids):
@@ -242,7 +215,6 @@ def get_my_tests_with_statistics_logic(db: Session, teacher: models.User) -> Lis
             "title": test.title,
             "subject": test.subject,
             "status": test.status,
-            "version": test.version,
             "total_attempts": stats[0] or 0,
             "unique_students": unique_students or 0,
             "average_score": round(stats[1], 2) if stats[1] else 0,

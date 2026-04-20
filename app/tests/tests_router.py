@@ -88,9 +88,9 @@ def get_test_details(
 ):
     return get_test_details_logic(db, current_user, test_id)
 
-@router.get("/teacher/my-tests-with-stats")
-def get_my_tests_with_statistics(
-    teacher: models.User = Depends(get_teacher_user),
-    db: Session = Depends(get_db)
-):
-    return get_my_tests_with_statistics_logic(db, teacher)
+# @router.get("/teacher/my-tests-with-stats")
+# def get_my_tests_with_statistics(
+#     teacher: models.User = Depends(get_teacher_user),
+#     db: Session = Depends(get_db)
+# ):
+#     return get_my_tests_with_statistics_logic(db, teacher)

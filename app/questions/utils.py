@@ -11,6 +11,7 @@ from app.database import get_db  # если нужен импорт, но зде
 def create_question_logic(db: Session, question_data: schemas.QuestionCreate) -> models.Question:
     """Создать новый вопрос (не привязанный к тесту)"""
     db_question = models.Question(
+        subject=question_data.subject,
         question_text=question_data.question_text,
         question_type=question_data.question_type,
         points=question_data.points,

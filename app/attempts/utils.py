@@ -11,9 +11,13 @@ def get_question_correct_answer(question: models.Question) -> Tuple[Optional[str
     data = question.data
 
     if qtype == models.QuestionType.single_choice:
-        correct_idx = data["correct"][0]
-        correct_options = [correct_idx]
-        correct_text = data["options"][correct_idx]["text"]
+        correct_id = data["correct"][0]                     # получаем id правильного варианта
+        # Ищем вариант с таким id
+        correct_option = next((opt for opt in data["options"] if opt["id"] == correct_id), None)
+        if correct_option is None:
+            raise ValueError(f"Option with id {correct_id} not found")
+        correct_text = correct_option["text"]               # текст правильного ответа
+        correct_options = [correct_id]                      # список id (для проверки по id)
         return correct_text, correct_options
 
     elif qtype == models.QuestionType.multiple_choice:
@@ -55,10 +59,10 @@ def calculate_question_score(question: models.Question, answer_data: Optional[di
             return 0.0
         total_weight = 0.0
         earned_weight = 0.0
-        for idx, opt in enumerate(question.data["options"]):
+        for opt in question.data["options"]:
             weight = opt.get("weight", 0)
             total_weight += abs(weight)
-            if idx in selected_options:
+            if opt.get("id") in selected_options:
                 earned_weight += weight
         if total_weight == 0:
             return 0.0

@@ -156,123 +156,123 @@ def get_my_attempts(
 
 # ==================== ПРЕПОДАВАТЕЛЬ: ПРОСМОТР ПОПЫТОК ====================
 
-@router.get("/teacher/test/{test_id}/summary", response_model=schemas.TestAttemptsSummary)
-def get_test_attempts_summary(
-    test_id: int,
-    teacher: models.User = Depends(get_teacher_user),
-    db: Session = Depends(get_db)
-):
-    """Сводка по всем попыткам теста (для преподавателя)."""
-    test = db.query(models.Test).filter(models.Test.id == test_id).first()
-    if not test:
-        raise HTTPException(status_code=404, detail="Test not found")
-    if test.author_id != teacher.id and teacher.role != models.UserRole.admin:
-        raise HTTPException(status_code=403, detail="Not authorized to view this test")
+# @router.get("/teacher/test/{test_id}/summary", response_model=schemas.TestAttemptsSummary)
+# def get_test_attempts_summary(
+#     test_id: int,
+#     teacher: models.User = Depends(get_teacher_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Сводка по всем попыткам теста (для преподавателя)."""
+#     test = db.query(models.Test).filter(models.Test.id == test_id).first()
+#     if not test:
+#         raise HTTPException(status_code=404, detail="Test not found")
+#     if test.author_id != teacher.id and teacher.role != models.UserRole.admin:
+#         raise HTTPException(status_code=403, detail="Not authorized to view this test")
 
-    attempts = db.query(models.TestAttempt).filter(
-        models.TestAttempt.test_id == test_id,
-        models.TestAttempt.is_completed == True
-    ).options(
-        joinedload(models.TestAttempt.student),
-        joinedload(models.TestAttempt.test)
-    ).order_by(models.TestAttempt.completed_at.desc()).all()
+#     attempts = db.query(models.TestAttempt).filter(
+#         models.TestAttempt.test_id == test_id,
+#         models.TestAttempt.is_completed == True
+#     ).options(
+#         joinedload(models.TestAttempt.student),
+#         joinedload(models.TestAttempt.test)
+#     ).order_by(models.TestAttempt.completed_at.desc()).all()
 
-    if not attempts:
-        return schemas.TestAttemptsSummary(
-            test_id=test_id,
-            test_title=test.title,
-            total_attempts=0,
-            average_score=0,
-            highest_score=0,
-            lowest_score=0,
-            attempts=[]
-        )
+#     if not attempts:
+#         return schemas.TestAttemptsSummary(
+#             test_id=test_id,
+#             test_title=test.title,
+#             total_attempts=0,
+#             average_score=0,
+#             highest_score=0,
+#             lowest_score=0,
+#             attempts=[]
+#         )
 
-    attempt_items = []
-    scores = []
-    for attempt in attempts:
-        attempt_number = get_attempt_number(attempt.id, attempt.student_id, test_id, db)
-        percentage = (attempt.score / test.max_score) * 100 if attempt.score else 0
-        scores.append(attempt.score or 0)
-        attempt_items.append(schemas.TeacherAttemptListItem(
-            attempt_id=attempt.id,
-            attempt_number=attempt_number,
-            student_id=attempt.student_id,
-            student_name=attempt.student.username,
-            started_at=attempt.started_at,
-            completed_at=attempt.completed_at,
-            score=attempt.score,
-            percentage=percentage
-        ))
+#     attempt_items = []
+#     scores = []
+#     for attempt in attempts:
+#         attempt_number = get_attempt_number(attempt.id, attempt.student_id, test_id, db)
+#         percentage = (attempt.score / test.max_score) * 100 if attempt.score else 0
+#         scores.append(attempt.score or 0)
+#         attempt_items.append(schemas.TeacherAttemptListItem(
+#             attempt_id=attempt.id,
+#             attempt_number=attempt_number,
+#             student_id=attempt.student_id,
+#             student_name=attempt.student.username,
+#             started_at=attempt.started_at,
+#             completed_at=attempt.completed_at,
+#             score=attempt.score,
+#             percentage=percentage
+#         ))
 
-    avg_score = sum(scores) / len(scores) if scores else 0
-    return schemas.TestAttemptsSummary(
-        test_id=test_id,
-        test_title=test.title,
-        total_attempts=len(attempts),
-        average_score=round(avg_score, 2),
-        highest_score=max(scores) if scores else 0,
-        lowest_score=min(scores) if scores else 0,
-        attempts=attempt_items
-    )
+#     avg_score = sum(scores) / len(scores) if scores else 0
+#     return schemas.TestAttemptsSummary(
+#         test_id=test_id,
+#         test_title=test.title,
+#         total_attempts=len(attempts),
+#         average_score=round(avg_score, 2),
+#         highest_score=max(scores) if scores else 0,
+#         lowest_score=min(scores) if scores else 0,
+#         attempts=attempt_items
+#     )
 
 
-@router.get("/teacher/student/{student_id}/test/{test_id}/attempts", response_model=schemas.StudentTestAttemptsSummary)
-def get_student_test_attempts(
-    student_id: int,
-    test_id: int,
-    teacher: models.User = Depends(get_teacher_user),
-    db: Session = Depends(get_db)
-):
-    """Все попытки конкретного студента по конкретному тесту."""
-    student = db.query(models.User).filter(
-        models.User.id == student_id,
-        models.User.role == models.UserRole.student
-    ).first()
-    if not student:
-        raise HTTPException(status_code=404, detail="Student not found")
+# @router.get("/teacher/student/{student_id}/test/{test_id}/attempts", response_model=schemas.StudentTestAttemptsSummary)
+# def get_student_test_attempts(
+#     student_id: int,
+#     test_id: int,
+#     teacher: models.User = Depends(get_teacher_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Все попытки конкретного студента по конкретному тесту."""
+#     student = db.query(models.User).filter(
+#         models.User.id == student_id,
+#         models.User.role == models.UserRole.student
+#     ).first()
+#     if not student:
+#         raise HTTPException(status_code=404, detail="Student not found")
 
-    test = db.query(models.Test).filter(models.Test.id == test_id).first()
-    if not test:
-        raise HTTPException(status_code=404, detail="Test not found")
-    if test.author_id != teacher.id and teacher.role != models.UserRole.admin:
-        raise HTTPException(status_code=403, detail="Not authorized to view this test")
+#     test = db.query(models.Test).filter(models.Test.id == test_id).first()
+#     if not test:
+#         raise HTTPException(status_code=404, detail="Test not found")
+#     if test.author_id != teacher.id and teacher.role != models.UserRole.admin:
+#         raise HTTPException(status_code=403, detail="Not authorized to view this test")
 
-    attempts = db.query(models.TestAttempt).filter(
-        models.TestAttempt.student_id == student_id,
-        models.TestAttempt.test_id == test_id,
-        models.TestAttempt.is_completed == True
-    ).order_by(models.TestAttempt.completed_at.desc()).all()
+#     attempts = db.query(models.TestAttempt).filter(
+#         models.TestAttempt.student_id == student_id,
+#         models.TestAttempt.test_id == test_id,
+#         models.TestAttempt.is_completed == True
+#     ).order_by(models.TestAttempt.completed_at.desc()).all()
 
-    if not attempts:
-        raise HTTPException(status_code=404, detail="No attempts found for this student")
+#     if not attempts:
+#         raise HTTPException(status_code=404, detail="No attempts found for this student")
 
-    attempt_items = []
-    scores = []
-    for attempt in attempts:
-        attempt_number = get_attempt_number(attempt.id, student_id, test_id, db)
-        percentage = (attempt.score / test.max_score) * 100 if attempt.score else 0
-        scores.append(attempt.score or 0)
-        attempt_items.append(schemas.StudentAttemptListItem(
-            attempt_id=attempt.id,
-            attempt_number=attempt_number,
-            started_at=attempt.started_at,
-            completed_at=attempt.completed_at,
-            score=attempt.score,
-            percentage=percentage
-        ))
+#     attempt_items = []
+#     scores = []
+#     for attempt in attempts:
+#         attempt_number = get_attempt_number(attempt.id, student_id, test_id, db)
+#         percentage = (attempt.score / test.max_score) * 100 if attempt.score else 0
+#         scores.append(attempt.score or 0)
+#         attempt_items.append(schemas.StudentAttemptListItem(
+#             attempt_id=attempt.id,
+#             attempt_number=attempt_number,
+#             started_at=attempt.started_at,
+#             completed_at=attempt.completed_at,
+#             score=attempt.score,
+#             percentage=percentage
+#         ))
 
-    best_score = max(scores) if scores else None
-    avg_score = sum(scores) / len(scores) if scores else 0
+#     best_score = max(scores) if scores else None
+#     avg_score = sum(scores) / len(scores) if scores else 0
 
-    return schemas.StudentTestAttemptsSummary(
-        test_id=test_id,
-        test_title=test.title,
-        best_score=best_score,
-        average_score=avg_score,
-        total_attempts=len(attempts),
-        attempts=attempt_items
-    )
+#     return schemas.StudentTestAttemptsSummary(
+#         test_id=test_id,
+#         test_title=test.title,
+#         best_score=best_score,
+#         average_score=avg_score,
+#         total_attempts=len(attempts),
+#         attempts=attempt_items
+#     )
 
 
 @router.get("/{attempt_id}", response_model=schemas.AttemptDetailResponse)
@@ -284,8 +284,7 @@ def get_attempt_detail(
     """Получить детальную информацию о попытке (для студента – свои, для преподавателя/админа – любые доступные)."""
     # 1. Загружаем попытку со всеми связями
     attempt = db.query(models.TestAttempt).filter(
-        models.TestAttempt.id == attempt_id,
-        models.TestAttempt.is_completed == True   # можно убрать, если нужны и незавершённые
+        models.TestAttempt.id == attempt_id,  # можно убрать, если нужны и незавершённые
     ).options(
         joinedload(models.TestAttempt.student),
         joinedload(models.TestAttempt.test),
@@ -322,7 +321,7 @@ def get_attempt_detail(
         attempt_id=attempt.id,
         attempt_number=attempt_number,
         student_id=attempt.student_id if current_user.role != models.UserRole.student else None,
-        student_name=attempt.student.username if current_user.role != models.UserRole.student else None,
+        student_name=attempt.student.name + " " + attempt.student.surname if current_user.role != models.UserRole.student else None,
         test_id=attempt.test_id,
         test_title=attempt.test.title,
         score=attempt.score,

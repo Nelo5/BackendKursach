@@ -56,7 +56,9 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, nullable=False, index=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    surname = Column(String, nullable=False)
     password = Column(String, nullable=False)
     role = Column(Enum(UserRole), default=UserRole.student, nullable=False)
     status = Column(Enum(UserStatus), default=UserStatus.active, nullable=False)
@@ -80,7 +82,6 @@ class Test(Base):
     title = Column(String, nullable=False)
     subject = Column(String, nullable=False)
     description = Column(String)
-    version = Column(Integer, default=1)
     max_score = Column(Float, nullable=False)
     status = Column(Enum(TestStatus), default=TestStatus.draft, nullable=False)
 
@@ -108,6 +109,7 @@ class Question(Base):
     __tablename__ = "questions"
 
     id = Column(Integer, primary_key=True, index=True)
+    subject = Column(String, nullable=False)
     question_text = Column(String, nullable=False)
     question_type = Column(Enum(QuestionType), nullable=False)
     points = Column(Float, nullable=False)
@@ -134,7 +136,7 @@ class TestAttempt(Base):
     student_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     test_id = Column(Integer, ForeignKey("tests.id"), nullable=False)
 
-    score = Column(Float, nullable=True)
+    score = Column(Float, nullable=False, default=0)
 
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
@@ -161,7 +163,7 @@ class Answer(Base):
     id = Column(Integer, primary_key=True, index=True)
     attempt_id = Column(
         Integer,
-        ForeignKey("test_attempts.id", ondelete="CASCADE"),
+        ForeignKey("attempts.id", ondelete="CASCADE"),
         nullable=False
     )
     question_id = Column(

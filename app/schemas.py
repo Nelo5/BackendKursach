@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, model_validator
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from enum import Enum
@@ -32,15 +32,16 @@ class TestStatus(str, Enum):
 # ===================== USERS =====================
 
 class UserBase(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50)
-
+    email: EmailStr = Field(..., description="Valid email address")
+    name: str = Field(..., min_length=1, max_length=50, description="First name")
+    surname: str = Field(..., min_length=1, max_length=50, description="Last name")
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=6)
 
 
 class UserLogin(BaseModel):
-    username: str
+    email: EmailStr = Field(..., description="Valid email address")
     password: str
 
 
@@ -64,6 +65,7 @@ class UserUpdateStatus(BaseModel):
 
 
 class QuestionCreate(BaseModel):
+    subject: str = Field(..., min_length=1)
     question_text: str = Field(..., min_length=1)
     question_type: QuestionType
     points: float = Field(..., gt=0)
@@ -103,6 +105,7 @@ class QuestionUpdate(BaseModel):
 
 class QuestionResponse(BaseModel):
     id: int
+    subject: str = Field(..., min_length=1)
     question_text: str
     question_type: QuestionType
     points: float
@@ -135,7 +138,6 @@ class TestUpdate(BaseModel):
 
 class TestResponse(TestBase):
     id: int
-    version: int
     status: TestStatus
     author_id: int
     created_at: datetime
@@ -148,7 +150,6 @@ class TestResponse(TestBase):
 
 class TestListItem(TestBase):
     id: int
-    version: int
     status: TestStatus
     author_id: int
 
@@ -288,12 +289,14 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     user_id: int
-    username: str
+    name: str
+    surname: str
+    email: EmailStr
     role: UserRole
 
 
 class TokenData(BaseModel):
-    username: Optional[str] = None
+    email: Optional[EmailStr] = None
     user_id: Optional[int] = None
     role: Optional[UserRole] = None
 

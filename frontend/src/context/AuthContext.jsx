@@ -1,12 +1,13 @@
+// src/context/AuthContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { authService } from '../services/auth.service';
+import { loginUser, registerUser, logoutUser } from '../api/auth';
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
 
-export const useAuth = () => {
+export const useAuthContext = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error('useAuthContext must be used within AuthProvider');
   }
   return context;
 };
@@ -14,64 +15,77 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  // При загрузке проверяем, есть ли сохранённый пользователь
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    const userData = localStorage.getItem('user');
-    if (token && userData) {
-      try {
-        setUser(JSON.parse(userData));
-      } catch (e) {
-        console.error('Failed to parse user data', e);
-      }
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
     }
     setLoading(false);
   }, []);
 
-  const login = async (username, password) => {
-    try {
-      const response = await authService.login(username, password);
-      const { access_token, user_id, username: userName, role } = response;
-      
-      const userData = { id: user_id, username: userName, role };
-      localStorage.setItem('access_token', access_token);
-      localStorage.setItem('user', JSON.stringify(userData));
+  // Регистрация (если бэкенд возвращает пользователя, сохраняем)
+  const register = async (userData) => {
+    setError(null);
+    const result = await registerUser(userData);
+    
+    if (result.success) {
+      // Если при регистрации бэкенд возвращает данные пользователя, используем их
+      // (по вашей схеме UserResponse, там есть id, role, status и т.д.)
+      setUser(result.data);
+      localStorage.setItem('user', JSON.stringify(result.data));
+      return { success: true };
+    } else {
+      setError(result.error);
+      return { success: false, error: result.error };
+    }
+  };
+
+  // Вход – берём данные из ответа loginUser
+  const login = async (credentials) => {
+    setError(null);
+    const result = await loginUser(credentials);
+    
+    if (result.success) {
+      // Формируем объект пользователя из полей, которые вернул бэкенд
+      const userData = {
+        id: result.data.user_id,
+        name: result.data.name,
+        surname: result.data.surname,
+        email: result.data.email,
+        role: result.data.role,
+      };
       setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
       return { success: true };
-    } catch (error) {
-      return { success: false, error: error.response?.data?.detail || 'Ошибка входа' };
+    } else {
+      setError(result.error);
+      return { success: false, error: result.error };
     }
   };
 
-  const register = async (username, password) => {
-    try {
-      await authService.register(username, password);
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.response?.data?.detail || 'Ошибка регистрации' };
-    }
-  };
-
+  // Выход
   const logout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user');
+    logoutUser();
     setUser(null);
+    setError(null);
   };
 
   const value = {
     user,
-    login,
+    loading,
+    error,
     register,
+    login,
     logout,
     isAuthenticated: !!user,
-    isAdmin: user?.role === 'admin',
-    isTeacher: user?.role === 'teacher' || user?.role === 'admin',
-    isStudent: user?.role === 'student'
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };

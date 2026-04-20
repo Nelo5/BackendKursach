@@ -8,6 +8,7 @@ from app.questions import questions_router
 from app.tests import tests_router
 from app.attempts import attempts_router
 from app.answers import answers_router
+from app.statistics import stat_router
 
 
 # Создаем таблицы
@@ -30,6 +31,7 @@ app.include_router(tests_router.router)
 app.include_router(attempts_router.router)
 app.include_router(questions_router.router)
 app.include_router(answers_router.router)
+app.include_router(stat_router.router)
 
 @app.get("/")
 def root():
